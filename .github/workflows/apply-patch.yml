@@ -1,0 +1,38 @@
+name: Apply patch
+
+# Actions tab -> "Apply patch" -> Run workflow (choose branch My-app).
+# Upload the patch file to the repo root first (default name: change.patch).
+on:
+  workflow_dispatch:
+    inputs:
+      patch_file:
+        description: 'Patch file name in the repo root'
+        required: true
+        default: 'change.patch'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply patch and commit
+        env:
+          PATCH: ${{ inputs.patch_file }}
+          BRANCH: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$PATCH" || { echo "File $PATCH not found in the repo root"; exit 1; }
+          git apply --check --whitespace=nowarn "$PATCH"
+          git apply --whitespace=nowarn "$PATCH"
+          rm -f -- "$PATCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Apply patch: $PATCH"
+          git push origin "HEAD:$BRANCH"
+          echo "Done. Patch applied and pushed to $BRANCH."
